@@ -3,8 +3,13 @@ import { useMemo, useRef, useState } from "react";
 const MODEL_ID = "onnx-community/Llama-3.2-1B-Instruct";
 const MODEL_TASK = "text-generation";
 const MODEL_DTYPE = "q4";
-const DEFAULT_SYSTEM_PROMPT = "You are a concise, helpful assistant.";
 const LOG_1024 = Math.log(1024);
+// Single-turn replies are deterministic so each prompt returns one plain, direct response.
+const SINGLE_TURN_GENERATION_OPTIONS = Object.freeze({
+  do_sample: false,
+  max_new_tokens: 160,
+  repetition_penalty: 1.02,
+});
 
 let pipelineModulePromise;
 
@@ -40,20 +45,34 @@ function clampProgress(value) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function cleanAssistantResponse(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.replace(/^\s*assistant:\s*/i, "").trim();
+}
+
+function extractGeneratedContent(generated) {
+  if (Array.isArray(generated)) {
+    return generated.at(-1)?.content || "";
+  }
+
+  if (typeof generated === "string") {
+    return generated;
+  }
+
+  return "";
+}
+
 function handleCacheStatusError(error) {
   console.warn("Unable to inspect model cache status.", error);
   return false;
 }
 
 export default function App() {
-  const [messages, setMessages] = useState([
-    {
-      role: "assistant",
-      content: "Hi. Load the model, then send a message to start chatting.",
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
   const [status, setStatus] = useState("Model not loaded yet.");
   const [error, setError] = useState("");
   const [isLoadingModel, setIsLoadingModel] = useState(false);
@@ -230,12 +249,7 @@ export default function App() {
   }
 
   function handleClearChat() {
-    setMessages([
-      {
-        role: "assistant",
-        content: "Chat cleared. Send a message when you are ready.",
-      },
-    ]);
+    setMessages([]);
     setError("");
   }
 
@@ -249,16 +263,12 @@ export default function App() {
     setInput("");
 
     const userMessage = { role: "user", content: text };
-    const placeholderMessage = { role: "assistant", content: "Thinking…", pending: true };
-    const visibleHistory = [...messages, userMessage]
-      .filter((message) => !message.pending)
-      .map(({ role, content }) => ({ role, content }));
+    const placeholderMessage = { role: "assistant", content: "Responding…", pending: true };
     const conversation = [
       {
-        role: "system",
-        content: systemPrompt.trim() || DEFAULT_SYSTEM_PROMPT,
+        role: "user",
+        content: text,
       },
-      ...visibleHistory,
     ];
 
     setMessages((previousMessages) => [...previousMessages, userMessage, placeholderMessage]);
@@ -267,19 +277,9 @@ export default function App() {
 
     try {
       const generator = await getGenerator();
-      const output = await generator(conversation, {
-        do_sample: true,
-        max_new_tokens: 256,
-        repetition_penalty: 1.05,
-        temperature: 0.7,
-        top_p: 0.9,
-      });
+      const output = await generator(conversation, SINGLE_TURN_GENERATION_OPTIONS);
       const generated = output?.[0]?.generated_text;
-      const assistantText = Array.isArray(generated)
-        ? generated.at(-1)?.content || ""
-        : typeof generated === "string"
-          ? generated
-          : "";
+      const assistantText = cleanAssistantResponse(extractGeneratedContent(generated));
 
       setMessages((previousMessages) => {
         const nextMessages = [...previousMessages];
@@ -331,15 +331,15 @@ export default function App() {
         <div className="panel-header">
           <div>
             <p className="eyebrow">GitHub Pages-ready SPA</p>
-            <h1>Transformers.js chat</h1>
+            <h1>Transformers.js prompt runner</h1>
           </div>
           <span className="status-pill">{status}</span>
         </div>
 
         <p className="panel-copy">
           Browser-only demo for <strong>{MODEL_ID}</strong> using the <strong>{MODEL_DTYPE}</strong>{" "}
-          quantized weights. The first download is large, but browser caching keeps the model local
-          for faster reloads when browser cache storage is available.
+          quantized weights. Each submit sends only the current prompt so the model returns one
+          direct response without carrying over prior turns.
         </p>
 
         <dl className="meta-grid">
@@ -371,15 +371,6 @@ export default function App() {
           </div>
         </dl>
 
-        <label className="field">
-          <span>System prompt</span>
-          <textarea
-            className="text-area"
-            value={systemPrompt}
-            onChange={(event) => setSystemPrompt(event.target.value)}
-          />
-        </label>
-
         {error ? <div className="error-box">{error}</div> : null}
 
         <div className="button-row">
@@ -396,7 +387,7 @@ export default function App() {
                 : "Load q4 model"}
           </button>
           <button type="button" className="button secondary" onClick={handleClearChat}>
-            Clear chat
+            Clear responses
           </button>
         </div>
 
@@ -432,28 +423,35 @@ export default function App() {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">Conversation</p>
-            <h2>Chat with the local model</h2>
+            <p className="eyebrow">Prompt and response</p>
+            <h2>One prompt at a time</h2>
           </div>
         </div>
 
         <div className="message-list" aria-live="polite">
-          {messages.map((message, index) => (
-            <article key={`${message.role}-${index}`} className={`message ${message.role}`}>
-              <header>{message.role}</header>
-              <p>{message.content}</p>
+          {messages.length ? (
+            messages.map((message, index) => (
+              <article key={`${message.role}-${index}`} className={`message ${message.role}`}>
+                <header>{message.role}</header>
+                <p>{message.content}</p>
+              </article>
+            ))
+          ) : (
+            <article className="message assistant">
+              <header>assistant</header>
+              <p>Load the model, enter a prompt, and the app will return one direct response.</p>
             </article>
-          ))}
+          )}
         </div>
 
         <label className="field">
-          <span>Message</span>
+          <span>Prompt</span>
           <textarea
             className="composer"
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={handleComposerKeyDown}
-            placeholder="Type your message and press Enter to send."
+            placeholder="Enter a prompt and press Enter to get one response."
             disabled={isLoadingModel || isGenerating}
           />
         </label>
