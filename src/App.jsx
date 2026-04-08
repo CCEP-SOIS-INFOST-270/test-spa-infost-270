@@ -4,6 +4,7 @@ const MODEL_ID = "onnx-community/Llama-3.2-1B-Instruct";
 const MODEL_TASK = "text-generation";
 const MODEL_DTYPE = "q4";
 const DEFAULT_SYSTEM_PROMPT = "You are a concise, helpful assistant.";
+const LOG_1024 = Math.log(1024);
 
 let pipelineModulePromise;
 
@@ -25,7 +26,7 @@ function formatBytes(value) {
   }
 
   const units = ["B", "KB", "MB", "GB"];
-  const exponent = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+  const exponent = Math.min(Math.floor(Math.log(value) / LOG_1024), units.length - 1);
   const amount = value / 1024 ** exponent;
 
   return `${amount.toFixed(amount >= 10 || exponent === 0 ? 0 : 1)} ${units[exponent]}`;
@@ -33,6 +34,10 @@ function formatBytes(value) {
 
 function getFileLabel(file) {
   return file ? file.split("/").at(-1) || file : "model files";
+}
+
+function clampProgress(value) {
+  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 function handleCacheStatusError(error) {
@@ -84,7 +89,7 @@ export default function App() {
         }));
         break;
       case "progress_total": {
-        const percent = Math.max(0, Math.min(100, Math.round(progressInfo.progress)));
+        const percent = clampProgress(progressInfo.progress);
         const loaded = formatBytes(progressInfo.loaded);
         const total = formatBytes(progressInfo.total);
 
@@ -113,7 +118,7 @@ export default function App() {
           ...previousProgress,
           visible: true,
           label: "Finishing model setup…",
-          percent: 100,
+          percent: clampProgress(100),
         }));
         break;
       default:
@@ -334,7 +339,7 @@ export default function App() {
         <p className="panel-copy">
           Browser-only demo for <strong>{MODEL_ID}</strong> using the <strong>{MODEL_DTYPE}</strong>{" "}
           quantized weights. The first download is large, but browser caching keeps the model local
-          for faster reloads when storage is available.
+          for faster reloads when browser cache storage is available.
         </p>
 
         <dl className="meta-grid">
