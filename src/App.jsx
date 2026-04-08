@@ -4,6 +4,7 @@ const MODEL_ID = "onnx-community/Llama-3.2-1B-Instruct";
 const MODEL_TASK = "text-generation";
 const MODEL_DTYPE = "q4";
 const LOG_1024 = Math.log(1024);
+// Single-turn replies are deterministic to keep responses direct and avoid simulated back-and-forth.
 const SINGLE_TURN_GENERATION_OPTIONS = Object.freeze({
   do_sample: false,
   max_new_tokens: 160,
@@ -50,7 +51,8 @@ function normalizeAssistantMessage(value) {
   }
 
   return value
-    .replace(/<think\b[^>]*>[\s\S]*?<\/think>|<\/?think\b[^>]*>/gi, "")
+    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "")
+    .replace(/<\/?think\b[^>]*>/gi, "")
     .replace(/^\s*assistant:\s*/i, "")
     .trim();
 }
