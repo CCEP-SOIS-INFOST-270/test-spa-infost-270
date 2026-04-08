@@ -4,6 +4,11 @@ const MODEL_ID = "onnx-community/Llama-3.2-1B-Instruct";
 const MODEL_TASK = "text-generation";
 const MODEL_DTYPE = "q4";
 const LOG_1024 = Math.log(1024);
+const SINGLE_TURN_GENERATION_OPTIONS = Object.freeze({
+  do_sample: false,
+  max_new_tokens: 160,
+  repetition_penalty: 1.02,
+});
 
 let pipelineModulePromise;
 
@@ -44,7 +49,11 @@ function normalizeAssistantMessage(value) {
     return "";
   }
 
-  return value.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/^\s*assistant:\s*/i, "").trim();
+  return value
+    .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "")
+    .replace(/<\/?think>/gi, "")
+    .replace(/^\s*assistant:\s*/i, "")
+    .trim();
 }
 
 function handleCacheStatusError(error) {
@@ -259,11 +268,7 @@ export default function App() {
 
     try {
       const generator = await getGenerator();
-      const output = await generator(conversation, {
-        do_sample: false,
-        max_new_tokens: 160,
-        repetition_penalty: 1.02,
-      });
+      const output = await generator(conversation, SINGLE_TURN_GENERATION_OPTIONS);
       const generated = output?.[0]?.generated_text;
       const assistantText = normalizeAssistantMessage(
         Array.isArray(generated)
