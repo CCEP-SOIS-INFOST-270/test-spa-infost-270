@@ -35,6 +35,11 @@ function getFileLabel(file) {
   return file ? file.split("/").at(-1) || file : "model files";
 }
 
+function handleCacheStatusError(error) {
+  console.warn("Unable to inspect model cache status.", error);
+  return false;
+}
+
 export default function App() {
   const [messages, setMessages] = useState([
     {
@@ -145,7 +150,9 @@ export default function App() {
 
         const cacheOptions = { dtype: MODEL_DTYPE };
         const wasCachedBeforeLoad = browserCacheAvailable
-          ? await ModelRegistry.is_pipeline_cached(MODEL_TASK, MODEL_ID, cacheOptions).catch(() => false)
+          ? await ModelRegistry.is_pipeline_cached(MODEL_TASK, MODEL_ID, cacheOptions).catch(
+              handleCacheStatusError,
+            )
           : false;
 
         if (wasCachedBeforeLoad) {
@@ -164,7 +171,9 @@ export default function App() {
         generatorRef.current = generator;
 
         const cachedAfterLoad = browserCacheAvailable
-          ? await ModelRegistry.is_pipeline_cached(MODEL_TASK, MODEL_ID, cacheOptions).catch(() => false)
+          ? await ModelRegistry.is_pipeline_cached(MODEL_TASK, MODEL_ID, cacheOptions).catch(
+              handleCacheStatusError,
+            )
           : false;
 
         setIsModelCached(cachedAfterLoad);
