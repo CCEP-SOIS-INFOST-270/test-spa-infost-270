@@ -49,11 +49,19 @@ function normalizeAssistantMessage(value) {
     return "";
   }
 
-  return value
-    .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "")
-    .replace(/<\/?think>/gi, "")
-    .replace(/^\s*assistant:\s*/i, "")
-    .trim();
+  let normalizedValue = value;
+  let thinkStart = normalizedValue.toLowerCase().indexOf("<think>");
+
+  while (thinkStart >= 0) {
+    const thinkEnd = normalizedValue.toLowerCase().indexOf("</think>", thinkStart + "<think>".length);
+    normalizedValue =
+      thinkEnd >= 0
+        ? `${normalizedValue.slice(0, thinkStart)}${normalizedValue.slice(thinkEnd + "</think>".length)}`
+        : normalizedValue.slice(0, thinkStart);
+    thinkStart = normalizedValue.toLowerCase().indexOf("<think>");
+  }
+
+  return normalizedValue.replace(/^\s*assistant:\s*/i, "").trim();
 }
 
 function handleCacheStatusError(error) {
