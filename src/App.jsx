@@ -29,7 +29,7 @@ export default function App() {
 
   const generatorRef = useRef(null);
   const generatorPromiseRef = useRef(null);
-  const webgpuAvailable = useMemo(() => typeof navigator !== "undefined" && "gpu" in navigator, []);
+  const webgpuAvailable = useMemo(() => typeof navigator !== "undefined" && Boolean(navigator.gpu), []);
 
   async function getGenerator() {
     if (generatorRef.current) {
@@ -73,7 +73,7 @@ export default function App() {
     }
   }
 
-  function clearChat() {
+  function handleClearChat() {
     setMessages([
       {
         role: "assistant",
@@ -220,7 +220,7 @@ export default function App() {
           >
             {isLoadingModel ? "Loading model…" : generatorRef.current ? "Model loaded" : "Load model"}
           </button>
-          <button type="button" className="button secondary" onClick={clearChat}>
+          <button type="button" className="button secondary" onClick={handleClearChat}>
             Clear chat
           </button>
         </div>
