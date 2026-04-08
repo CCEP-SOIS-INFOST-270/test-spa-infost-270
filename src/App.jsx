@@ -50,10 +50,21 @@ function normalizeAssistantMessage(value) {
   }
 
   return value
-    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "")
-    .replace(/<\/?think\b[^>]*>/gi, "")
+    .replace(/<think\b[^>]*>[\s\S]*?<\/think>|<\/?think\b[^>]*>/gi, "")
     .replace(/^\s*assistant:\s*/i, "")
     .trim();
+}
+
+function extractGeneratedContent(generated) {
+  if (Array.isArray(generated)) {
+    return generated.at(-1)?.content || "";
+  }
+
+  if (typeof generated === "string") {
+    return generated;
+  }
+
+  return "";
 }
 
 function handleCacheStatusError(error) {
@@ -270,13 +281,7 @@ export default function App() {
       const generator = await getGenerator();
       const output = await generator(conversation, SINGLE_TURN_GENERATION_OPTIONS);
       const generated = output?.[0]?.generated_text;
-      const assistantText = normalizeAssistantMessage(
-        Array.isArray(generated)
-          ? generated.at(-1)?.content || ""
-          : typeof generated === "string"
-            ? generated
-            : "",
-      );
+      const assistantText = normalizeAssistantMessage(extractGeneratedContent(generated));
 
       setMessages((previousMessages) => {
         const nextMessages = [...previousMessages];
