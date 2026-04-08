@@ -4,7 +4,7 @@ const MODEL_ID = "onnx-community/Llama-3.2-1B-Instruct";
 const MODEL_TASK = "text-generation";
 const MODEL_DTYPE = "q4";
 const LOG_1024 = Math.log(1024);
-// Single-turn replies are deterministic to keep responses direct and avoid simulated back-and-forth.
+// Single-turn replies are deterministic so each prompt returns one plain, direct response.
 const SINGLE_TURN_GENERATION_OPTIONS = Object.freeze({
   do_sample: false,
   max_new_tokens: 160,
@@ -45,16 +45,12 @@ function clampProgress(value) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function normalizeAssistantMessage(value) {
+function cleanAssistantResponse(value) {
   if (typeof value !== "string") {
     return "";
   }
 
-  return value
-    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "")
-    .replace(/<\/?think\b[^>]*>/gi, "")
-    .replace(/^\s*assistant:\s*/i, "")
-    .trim();
+  return value.replace(/^\s*assistant:\s*/i, "").trim();
 }
 
 function extractGeneratedContent(generated) {
@@ -283,7 +279,7 @@ export default function App() {
       const generator = await getGenerator();
       const output = await generator(conversation, SINGLE_TURN_GENERATION_OPTIONS);
       const generated = output?.[0]?.generated_text;
-      const assistantText = normalizeAssistantMessage(extractGeneratedContent(generated));
+      const assistantText = cleanAssistantResponse(extractGeneratedContent(generated));
 
       setMessages((previousMessages) => {
         const nextMessages = [...previousMessages];
